@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    This file is part of Everit - Localization.
+
+    Everit - Localization is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Lesser General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Everit - Localization is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public License
+    along with Everit - Localization.  If not, see <http://www.gnu.org/licenses/>.
+
+-->
+
+<databaseChangeLog objectQuotingStrategy="QUOTE_ALL_OBJECTS" xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ext="http://www.liquibase.org/xml/ns/dbchangelog-ext"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.0.xsd
+        http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
+
+  <changeSet id="1" author="everit">
+    <sql dbms="h2">CREATE SCHEMA IF NOT EXISTS "org.everit.osgi.localization.schema"</sql>
+    <sql dbms="postgresql">CREATE SCHEMA "org.everit.osgi.localization.schema"</sql>
+
+    <createTable tableName="localized_data" schemaName="org.everit.osgi.localization.schema">
+      <column name="localized_data_id" type="bigint" autoIncrement="true">
+        <constraints primaryKey="true" nullable="false"  />
+      </column>
+      <column name="default_locale" type="boolean" >
+        <constraints nullable="false" />
+      </column>
+      <column name="key_" type="varchar(255)" />
+      <column name="locale_" type="varchar(10)" />
+      <column name="value_" type="varchar(2000)" />
+<!--            TODO fix uniqueConstrint syntax -->
+    </createTable>
+    <addUniqueConstraint columnNames="key_, locale_" constraintName="unique_key_locale"
+        schemaName="org.everit.osgi.localization.schema" tableName="localized_data" />
+  </changeSet>
+
+</databaseChangeLog>
+
