@@ -17,7 +17,6 @@
 package org.everit.osgi.localization.internal;
 
 import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -28,7 +27,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
-import java.util.logging.Level;
 
 import javax.sql.DataSource;
 
@@ -44,20 +42,19 @@ import org.everit.osgi.cache.api.CacheConfiguration;
 import org.everit.osgi.cache.api.CacheFactory;
 import org.everit.osgi.cache.api.CacheHolder;
 import org.everit.osgi.localization.api.ErrorCode;
-import org.everit.osgi.localization.api.ExpandedSQLTemplates;
 import org.everit.osgi.localization.api.LocalizationException;
 import org.everit.osgi.localization.api.LocalizationService;
 import org.everit.osgi.localization.api.dto.LocalizedData;
 import org.everit.osgi.localization.schema.QLocalizedData;
-import org.everit.osgi.transaction.helper.api.Callback;
+import org.everit.osgi.querydsl.support.QuerydslSupport;
 import org.everit.osgi.transaction.helper.api.TransactionHelper;
 import org.osgi.framework.BundleContext;
 import org.osgi.framework.wiring.BundleWiring;
 import org.osgi.service.log.LogService;
 
+import com.mysema.query.sql.Configuration;
 import com.mysema.query.sql.SQLQuery;
 import com.mysema.query.sql.SQLSubQuery;
-import com.mysema.query.sql.SQLTemplates;
 import com.mysema.query.sql.dml.SQLDeleteClause;
 import com.mysema.query.sql.dml.SQLInsertClause;
 import com.mysema.query.sql.dml.SQLUpdateClause;
@@ -77,39 +74,32 @@ import com.mysema.query.types.query.StringSubQuery;
         @Property(name = "logService.target") })
 @Service
 public class LocalizationComponent implements LocalizationService {
+
     /**
-     * {@link ExpandedSQLTemplates} instance for queries.
-     */
-    public static final SQLTemplates SQL_TEMPLATES = new ExpandedSQLTemplates();
-    /**
-     * Caching that is used in front of the database. The localeCache is holding all the locals which are stored in the
-     * database. When new data are stored in the DB the cache reloads all the locals from DB again.
-     */
-    private List<Locale> localeCache = new ArrayList<Locale>();
-    /**
-     * {@link DataSource}.
+     * {@link CacheConfiguration}.
      */
     @Reference
-    private DataSource dataSource;
-    /**
-     * {@link TransactionHelper}.
-     */
-    @Reference
-    private TransactionHelper t;
+    private CacheConfiguration<String, Map<Locale, LocalizedData>> cacheConfiguration;
+
     /**
      * {@link CacheFactory}.
      */
     @Reference
     private CacheFactory cacheFactory;
     /**
-     * {@link CacheConfiguration}.
-     */
-    @Reference
-    private CacheConfiguration<String, Map<Locale, LocalizedData>> cacheConfiguration;
-    /**
      * {@link CacheHolder}.
      */
     private CacheHolder<String, Map<Locale, LocalizedData>> cacheHolder;
+    /**
+     * {@link DataSource}.
+     */
+    @Reference
+    private DataSource dataSource;
+    /**
+     * Caching that is used in front of the database. The localeCache is holding all the locals which are stored in the
+     * database. When new data are stored in the DB the cache reloads all the locals from DB again.
+     */
+    private List<Locale> localeCache = new ArrayList<Locale>();
     /**
      * Caching that is used in front of the entity manager. The localizedDataCache is based on the key of the localized
      * data. When a new localized data is created or an existing is updated based on a key all of the localized data
@@ -121,6 +111,13 @@ public class LocalizationComponent implements LocalizationService {
      */
     @Reference
     private LogService logService;
+    @Reference
+    private QuerydslSupport querydslSupport;
+    /**
+     * {@link TransactionHelper}.
+     */
+    @Reference
+    private TransactionHelper t;
 
     @Activate
     public void activate(final BundleContext context) {
@@ -142,6 +139,10 @@ public class LocalizationComponent implements LocalizationService {
         this.logService = logService;
     }
 
+    public void bindQuerydslSupport(QuerydslSupport querydslSupport) {
+        this.querydslSupport = querydslSupport;
+    }
+
     @Override
     public void clearCache() {
         localizedDataCache.clear();
@@ -150,7 +151,7 @@ public class LocalizationComponent implements LocalizationService {
 
     /**
      * Convert String to Locale.
-     * 
+     *
      * @param localeString
      *            The string what have to convert.
      * @return The new Locale or null if conversion fails.
@@ -179,36 +180,22 @@ public class LocalizationComponent implements LocalizationService {
     @Override
     public LocalizedData createLocalizedData(final String key, final Locale locale, final String value,
             final boolean defaultLocale) {
-        Connection connection = null;
-        LocalizedData ld = new LocalizedData();
-        try {
-            connection = dataSource.getConnection();
 
+        return querydslSupport.execute((connection, configuration) -> {
             String defaultLocaleStr = getDefaultLocaleByKey(key);
             if (!"".equals(defaultLocaleStr) && defaultLocale) {
                 throw new LocalizationException(ErrorCode.DEFAULT_VALUE);
             }
 
             QLocalizedData localizedData = new QLocalizedData("qLocalizedData");
-            SQLInsertClause insertClause = new SQLInsertClause(connection, SQL_TEMPLATES, localizedData);
+            SQLInsertClause insertClause = new SQLInsertClause(connection, configuration, localizedData);
             insertClause.set(localizedData.defaultLocale, defaultLocale)
                     .set(localizedData.key_, key)
                     .set(localizedData.locale_, locale.toString())
                     .set(localizedData.value_, value)
                     .executeWithKey(localizedData.localizedDataId);
-            ld = new LocalizedData(key, locale, defaultLocale, value);
-        } catch (SQLException e) {
-            logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-        } finally {
-            try {
-                if (connection != null) {
-                    connection.close();
-                }
-            } catch (SQLException e) {
-                logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-            }
-        }
-        return ld;
+            return new LocalizedData(key, locale, defaultLocale, value);
+        });
     }
 
     @Deactivate
@@ -217,31 +204,17 @@ public class LocalizationComponent implements LocalizationService {
     }
 
     private List<LocalizedData> findLocalizedDataByKeyFromDataBase(final String key) {
-        Connection connection = null;
-        List<LocalizedData> list = new ArrayList<LocalizedData>();
-        try {
-            connection = dataSource.getConnection();
+        return querydslSupport.execute((connection, configuration) -> {
             QLocalizedData localizedData = QLocalizedData.localizedData;
-            SQLQuery selectClause = new SQLQuery(connection, SQL_TEMPLATES);
+            SQLQuery selectClause = new SQLQuery(connection, configuration);
             selectClause.from(localizedData);
             selectClause.where(localizedData.key_.eq(key));
-            list = selectClause.list((ConstructorExpression.create(LocalizedData.class,
+            return selectClause.list((ConstructorExpression.create(LocalizedData.class,
                     localizedData.key_,
                     localizedData.locale_,
                     localizedData.defaultLocale,
                     localizedData.value_)));
-        } catch (SQLException e) {
-            logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-        } finally {
-            try {
-                if (connection != null) {
-                    connection.close();
-                }
-            } catch (SQLException e) {
-                logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-            }
-        }
-        return list;
+        });
     }
 
     @Override
@@ -259,45 +232,28 @@ public class LocalizationComponent implements LocalizationService {
 
     /**
      * Reads all the locals in the database.
-     * 
+     *
      * @return {@link List} of locale strings.
      */
     public List<String> getAvailableLocals() {
-        List<String> locals = new ArrayList<String>();
-        Connection connection = null;
-        try {
-            connection = dataSource.getConnection();
+        return querydslSupport.execute((connection, configuration) -> {
             QLocalizedData localizedData = new QLocalizedData("qLocalizedData");
-            SQLQuery selectClause = new SQLQuery(connection, SQL_TEMPLATES);
-            locals = selectClause.from(localizedData).distinct().list(localizedData.locale_);
-        } catch (SQLException e) {
-            logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-        } finally {
-            try {
-                if (connection != null) {
-                    connection.close();
-                }
-            } catch (SQLException e) {
-                logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-            }
-        }
-        return locals;
+            SQLQuery selectClause = new SQLQuery(connection, configuration);
+            return selectClause.from(localizedData).distinct().list(localizedData.locale_);
+        });
     }
 
     /**
      * Finds the default locale for a given key.
-     * 
+     *
      * @param key
      *            The key of the localized data.
      * @return String value of the default locale for the localizedData found by the given key.
      */
     private String getDefaultLocaleByKey(final String key) {
-        Connection connection = null;
-        try {
-            connection = dataSource.getConnection();
-
+        return querydslSupport.execute((connection, configuration) -> {
             QLocalizedData localizedData = new QLocalizedData("qLocalizedData");
-            SQLQuery query = new SQLQuery(connection, SQL_TEMPLATES);
+            SQLQuery query = new SQLQuery(connection, configuration);
 
             query.from(localizedData);
             query.where(localizedData.key_.eq(key), localizedData.defaultLocale.eq(true)).count();
@@ -307,21 +263,9 @@ public class LocalizationComponent implements LocalizationService {
             } else if (list.size() == 1) {
                 return list.get(0);
             } else {
-                return "";
+                return key;
             }
-        } catch (SQLException e) {
-            logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-        } finally {
-            try {
-                if (connection != null) {
-                    connection.close();
-                }
-            } catch (SQLException e) {
-                logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-            }
-        }
-        return "";
-
+        });
     }
 
     @Override
@@ -368,7 +312,7 @@ public class LocalizationComponent implements LocalizationService {
 
     /**
      * Returns the localized data records from database that belong to a key. Refresh the localizedDataCache.
-     * 
+     *
      * @param key
      *            The key of data.
      * @return The Map of found data.
@@ -422,7 +366,7 @@ public class LocalizationComponent implements LocalizationService {
 
     /**
      * Pessimistic locking on the record matching the given parameters.
-     * 
+     *
      * @param connection
      *            {@link Connection}.
      * @param localizedData
@@ -434,8 +378,8 @@ public class LocalizationComponent implements LocalizationService {
      * @return {@link List} of {@link LocalizedData} which are lock
      */
     private List<LocalizedData> getLockOnLocalizedData(final Connection connection, final QLocalizedData localizedData,
-            final String key, final Locale locale) {
-        SQLQuery query = new SQLQuery(connection, SQL_TEMPLATES);
+            final String key, final Locale locale, final Configuration configuration) {
+        SQLQuery query = new SQLQuery(connection, configuration);
         query.from(localizedData);
         query.where(localizedData.key_.eq(key).and(localizedData.locale_.eq(locale.toString())));
         List<LocalizedData> result = query.forUpdate().list((ConstructorExpression.create(LocalizedData.class,
@@ -467,69 +411,40 @@ public class LocalizationComponent implements LocalizationService {
         if (removeData.isDefaultLocale() && (localizedDataMap.size() > 1)) {
             throw new IllegalArgumentException(ErrorCode.DEFAULT_LOCALE_CANNOT_BE_REMOVED);
         }
-        Connection connection = null;
-        long rowsAffected = 0;
-        try {
-            connection = dataSource.getConnection();
+
+        return querydslSupport.execute((connection, configuration) -> {
             QLocalizedData localizedData = new QLocalizedData("qLocalizedData");
-            SQLDeleteClause deleteClause = new SQLDeleteClause(connection, SQL_TEMPLATES, localizedData);
+            SQLDeleteClause deleteClause = new SQLDeleteClause(connection, configuration, localizedData);
             deleteClause.where(localizedData.key_.eq(key).and(localizedData.locale_.eq(locale.toString())));
-            rowsAffected = deleteClause.execute();
-        } catch (SQLException e) {
-            logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-        } finally {
-            try {
-                if (connection != null) {
-                    connection.close();
-                }
-            } catch (SQLException e) {
-                logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-            }
-        }
-        localizedDataCache.remove(key);
-        return rowsAffected;
+            localizedDataCache.remove(key);
+            return deleteClause.execute();
+        });
     }
 
     @Override
     public long updateLocalizedData(final String key, final Locale locale, final String value,
             final boolean defaultLocale) {
-        return t.required(new Callback<Long>() {
-            @Override
-            public Long execute() {
-                Connection connection = null;
-                long rowsAffected = 0;
-                try {
-                    connection = dataSource.getConnection();
-                    QLocalizedData localizedData = new QLocalizedData("qLocalizedData");
-                    List<LocalizedData> list = getLockOnLocalizedData(connection, localizedData, key, locale);
-                    if (list.size() == 0) {
-                        return rowsAffected;
-                    }
-
-                    if ((list.get(0).isDefaultLocale() != defaultLocale)
-                            && (list.get(0).isDefaultLocale() || defaultLocale)) {
-                        throw new LocalizationException(ErrorCode.DEFAULT_VALUE);
-                    }
-
-                    SQLUpdateClause updateClause = new SQLUpdateClause(connection, SQL_TEMPLATES, localizedData);
-                    updateClause.where(localizedData.key_.eq(key).and(localizedData.locale_.eq(locale.toString())));
-                    updateClause.set(localizedData.defaultLocale, defaultLocale);
-                    updateClause.set(localizedData.value_, value);
-                    rowsAffected = updateClause.execute();
-                    localizedDataCache.remove(key);
-                } catch (SQLException e) {
-                    logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-                } finally {
-                    try {
-                        if (connection != null) {
-                            connection.close();
-                        }
-                    } catch (SQLException e) {
-                        logService.log(Level.SEVERE.intValue(), e.getMessage(), e);
-                    }
+        return t.required(() -> {
+            return (Long) querydslSupport.execute((connection, configuration) -> {
+                QLocalizedData localizedData = new QLocalizedData("qLocalizedData");
+                List<LocalizedData> list =
+                        getLockOnLocalizedData(connection, localizedData, key, locale, configuration);
+                if (list.size() == 0) {
+                    return 0;
                 }
-                return rowsAffected;
-            }
+
+                if ((list.get(0).isDefaultLocale() != defaultLocale)
+                        && (list.get(0).isDefaultLocale() || defaultLocale)) {
+                    throw new LocalizationException(ErrorCode.DEFAULT_VALUE);
+                }
+
+                SQLUpdateClause updateClause = new SQLUpdateClause(connection, configuration, localizedData);
+                updateClause.where(localizedData.key_.eq(key).and(localizedData.locale_.eq(locale.toString())));
+                updateClause.set(localizedData.defaultLocale, defaultLocale);
+                updateClause.set(localizedData.value_, value);
+                localizedDataCache.remove(key);
+                return updateClause.execute();
+            });
         });
     }
 
