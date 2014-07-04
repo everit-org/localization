@@ -17,9 +17,7 @@
 package org.everit.osgi.localization.internal;
 
 import java.sql.Connection;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -27,8 +25,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
-
-import javax.sql.DataSource;
 
 import org.apache.felix.scr.annotations.Activate;
 import org.apache.felix.scr.annotations.Component;
@@ -43,8 +39,8 @@ import org.everit.osgi.cache.api.CacheFactory;
 import org.everit.osgi.cache.api.CacheHolder;
 import org.everit.osgi.localization.api.ErrorCode;
 import org.everit.osgi.localization.api.LocalizationException;
-import org.everit.osgi.localization.api.LocalizationService;
-import org.everit.osgi.localization.api.dto.LocalizedData;
+import org.everit.osgi.localization.api.LocalizedDataStore;
+import org.everit.osgi.localization.api.dto.LocalizedValue;
 import org.everit.osgi.localization.schema.QLocalizedData;
 import org.everit.osgi.querydsl.support.QuerydslSupport;
 import org.everit.osgi.transaction.helper.api.TransactionHelper;
@@ -56,67 +52,56 @@ import com.mysema.query.sql.Configuration;
 import com.mysema.query.sql.SQLQuery;
 import com.mysema.query.sql.SQLSubQuery;
 import com.mysema.query.sql.dml.SQLDeleteClause;
-import com.mysema.query.sql.dml.SQLInsertClause;
 import com.mysema.query.sql.dml.SQLUpdateClause;
 import com.mysema.query.types.ConstructorExpression;
-import com.mysema.query.types.Expression;
 import com.mysema.query.types.Path;
 import com.mysema.query.types.expr.BooleanExpression;
 import com.mysema.query.types.expr.Coalesce;
 import com.mysema.query.types.query.StringSubQuery;
 
 /**
- * Implementation for {@link LocalizationService}.
+ * Implementation for {@link LocalizedDataStore}.
  */
 @Component(name = "org.everit.osgi.localization.LocalizationComponent", metatype = true, configurationFactory = true,
         policy = ConfigurationPolicy.REQUIRE)
 @Properties({ @Property(name = "dataSource.target"), @Property(name = "cacheFactory.target"),
         @Property(name = "logService.target") })
 @Service
-public class LocalizationComponent implements LocalizationService {
+public class LocalizationComponent implements LocalizedDataStore {
 
     /**
      * {@link CacheConfiguration}.
      */
-    @Reference
-    private CacheConfiguration<String, Map<Locale, LocalizedData>> cacheConfiguration;
+    @Reference(bind = "setCacheConfiguration")
+    private CacheConfiguration<String, Map<Locale, LocalizedValue>> cacheConfiguration;
 
     /**
      * {@link CacheFactory}.
      */
-    @Reference
+    @Reference(bind = "setCacheFactory")
     private CacheFactory cacheFactory;
     /**
      * {@link CacheHolder}.
      */
-    private CacheHolder<String, Map<Locale, LocalizedData>> cacheHolder;
-    /**
-     * {@link DataSource}.
-     */
-    @Reference
-    private DataSource dataSource;
-    /**
-     * Caching that is used in front of the database. The localeCache is holding all the locals which are stored in the
-     * database. When new data are stored in the DB the cache reloads all the locals from DB again.
-     */
-    private List<Locale> localeCache = new ArrayList<Locale>();
+    private CacheHolder<String, Map<Locale, LocalizedValue>> cacheHolder;
+
     /**
      * Caching that is used in front of the entity manager. The localizedDataCache is based on the key of the localized
      * data. When a new localized data is created or an existing is updated based on a key all of the localized data
      * will be deleted belonging to the specified key.
      */
-    private ConcurrentMap<String, Map<Locale, LocalizedData>> localizedDataCache;
+    private ConcurrentMap<String, Map<Locale, LocalizedValue>> localizedDataCache;
+
     /**
      * {@link LogService}.
      */
-    @Reference
+    @Reference(bind = "setLogService")
     private LogService logService;
-    @Reference
+
+    @Reference(bind = "setQuerydslSupport")
     private QuerydslSupport querydslSupport;
-    /**
-     * {@link TransactionHelper}.
-     */
-    @Reference
+
+    @Reference(bind = "setTransactionHelper")
     private TransactionHelper t;
 
     @Activate
@@ -127,26 +112,15 @@ public class LocalizationComponent implements LocalizationService {
         localizedDataCache = cacheHolder.getCache();
     }
 
-    public void bindCacheFactory(final CacheFactory cacheFactory) {
-        this.cacheFactory = cacheFactory;
-    }
-
-    public void bindDataSource(final DataSource dataSource) {
-        this.dataSource = dataSource;
-    }
-
-    public void bindLogService(final LogService logService) {
-        this.logService = logService;
-    }
-
-    public void bindQuerydslSupport(QuerydslSupport querydslSupport) {
-        this.querydslSupport = querydslSupport;
+    @Override
+    public LocalizedValue addValue(String key, Locale locale, String value) {
+        // TODO Auto-generated method stub
+        return null;
     }
 
     @Override
     public void clearCache() {
         localizedDataCache.clear();
-        localeCache.clear();
     }
 
     /**
@@ -177,39 +151,18 @@ public class LocalizationComponent implements LocalizationService {
         return null;
     }
 
-    @Override
-    public LocalizedData createLocalizedData(final String key, final Locale locale, final String value,
-            final boolean defaultLocale) {
-
-        return querydslSupport.execute((connection, configuration) -> {
-            String defaultLocaleStr = getDefaultLocaleByKey(key);
-            if (!"".equals(defaultLocaleStr) && defaultLocale) {
-                throw new LocalizationException(ErrorCode.DEFAULT_VALUE);
-            }
-
-            QLocalizedData localizedData = new QLocalizedData("qLocalizedData");
-            SQLInsertClause insertClause = new SQLInsertClause(connection, configuration, localizedData);
-            insertClause.set(localizedData.defaultLocale, defaultLocale)
-                    .set(localizedData.key_, key)
-                    .set(localizedData.locale_, locale.toString())
-                    .set(localizedData.value_, value)
-                    .executeWithKey(localizedData.localizedDataId);
-            return new LocalizedData(key, locale, defaultLocale, value);
-        });
-    }
-
     @Deactivate
     public void deactivate() {
         cacheHolder.close();
     }
 
-    private List<LocalizedData> findLocalizedDataByKeyFromDataBase(final String key) {
+    private List<LocalizedValue> findLocalizedDataByKeyFromDataBase(final String key) {
         return querydslSupport.execute((connection, configuration) -> {
             QLocalizedData localizedData = QLocalizedData.localizedData;
             SQLQuery selectClause = new SQLQuery(connection, configuration);
             selectClause.from(localizedData);
             selectClause.where(localizedData.key_.eq(key));
-            return selectClause.list((ConstructorExpression.create(LocalizedData.class,
+            return selectClause.list((ConstructorExpression.create(LocalizedValue.class,
                     localizedData.key_,
                     localizedData.locale_,
                     localizedData.defaultLocale,
@@ -218,16 +171,10 @@ public class LocalizationComponent implements LocalizationService {
     }
 
     @Override
-    public List<Locale> getAvailableLocales() {
-        if (localeCache.isEmpty()) {
-            List<Locale> availableLocales = new ArrayList<Locale>();
-            List<String> tempLocals = getAvailableLocals();
-            for (String locString : tempLocals) {
-                availableLocales.add(convertStringToLocale(locString));
-            }
-            localeCache = Collections.unmodifiableList(availableLocales);
-        }
-        return localeCache;
+    public Coalesce<String> generateLocalizedExpression(final Path<String> localizationKey, final Locale locale) {
+        StringSubQuery localizedQuery = getLocalizedValueSubQuery(localizationKey, locale);
+        StringSubQuery defaultQuery = getLocalizedValueSubQuery(localizationKey, null);
+        return new Coalesce<String>(String.class).add(localizedQuery).add(defaultQuery).add(localizationKey);
     }
 
     /**
@@ -268,42 +215,8 @@ public class LocalizationComponent implements LocalizationService {
         });
     }
 
-    @Override
-    public LocalizedData getLocalizedDataByKey(final String key, final Locale locale) {
-        if (key == null) {
-            throw new IllegalArgumentException("Key cannot be null.");
-        }
-        if (locale == null) {
-            throw new IllegalArgumentException("Locale cannot be null.");
-        }
-
-        Map<Locale, LocalizedData> localizedDataMap = getLocalizedDataMap(key);
-        if (localizedDataMap == null) {
-            return null;
-        }
-        LocalizedData localizedData = localizedDataMap.get(locale);
-        if (localizedData == null) {
-            if (locale.getVariant() != "") {
-                String localeString = locale.getLanguage() + locale.getCountry();
-                localizedData = localizedDataMap.get(convertStringToLocale(localeString));
-            }
-            if ((localizedData == null) && (locale.getCountry() != "")) {
-                String localeString = locale.getLanguage();
-                localizedData = localizedDataMap.get(convertStringToLocale(localeString));
-            }
-            if (localizedData == null) {
-                for (LocalizedData tmpLocalizedData : localizedDataMap.values()) {
-                    if (tmpLocalizedData.isDefaultLocale()) {
-                        return tmpLocalizedData;
-                    }
-                }
-            }
-        }
-        return localizedData;
-    }
-
-    private Map<Locale, LocalizedData> getLocalizedDataMap(final String key) {
-        Map<Locale, LocalizedData> localizedDataMap = localizedDataCache.get(key);
+    private Map<Locale, LocalizedValue> getLocalizedDataMap(final String key) {
+        Map<Locale, LocalizedValue> localizedDataMap = localizedDataCache.get(key);
         if (localizedDataMap == null) {
             localizedDataMap = getLocalizedDataMapByKeyFromDataBase(key);
         }
@@ -317,13 +230,13 @@ public class LocalizationComponent implements LocalizationService {
      *            The key of data.
      * @return The Map of found data.
      */
-    private Map<Locale, LocalizedData> getLocalizedDataMapByKeyFromDataBase(final String key) {
-        List<LocalizedData> localizedDataList = findLocalizedDataByKeyFromDataBase(key);
+    private Map<Locale, LocalizedValue> getLocalizedDataMapByKeyFromDataBase(final String key) {
+        List<LocalizedValue> localizedDataList = findLocalizedDataByKeyFromDataBase(key);
         if ((localizedDataList == null) || localizedDataList.isEmpty()) {
             return null;
         }
-        Map<Locale, LocalizedData> localizedDataMap = new HashMap<Locale, LocalizedData>();
-        for (LocalizedData localizedData : localizedDataList) {
+        Map<Locale, LocalizedValue> localizedDataMap = new HashMap<Locale, LocalizedValue>();
+        for (LocalizedValue localizedData : localizedDataList) {
             localizedDataMap.put(localizedData.getLocale(), localizedData);
         }
         localizedDataCache.put(key, localizedDataMap);
@@ -331,25 +244,18 @@ public class LocalizationComponent implements LocalizationService {
     }
 
     @Override
-    public Map<Locale, LocalizedData> getLocalizedDataMapClone(final String key) {
-        Map<Locale, LocalizedData> localizedDataMap = getLocalizedDataMap(key);
+    public Map<Locale, LocalizedValue> getLocalizedValuesByKey(final String key) {
+        Map<Locale, LocalizedValue> localizedDataMap = getLocalizedDataMap(key);
         if (localizedDataMap == null) {
             return null;
         }
 
-        Map<Locale, LocalizedData> clonedLocalizedDataMap = new HashMap<Locale, LocalizedData>();
+        Map<Locale, LocalizedValue> clonedLocalizedDataMap = new HashMap<Locale, LocalizedValue>();
         for (Locale locale : localizedDataMap.keySet()) {
-            LocalizedData localizedData = localizedDataMap.get(locale);
+            LocalizedValue localizedData = localizedDataMap.get(locale);
             clonedLocalizedDataMap.put(locale, localizedData);
         }
         return clonedLocalizedDataMap;
-    }
-
-    @Override
-    public Expression<String> getLocalizedValue(final Path<String> localizationKey, final Locale locale) {
-        StringSubQuery localizedQuery = getLocalizedValueSubQuery(localizationKey, locale);
-        StringSubQuery defaultQuery = getLocalizedValueSubQuery(localizationKey, null);
-        return new Coalesce<String>(String.class).add(localizedQuery).add(defaultQuery).add(localizationKey);
     }
 
     private StringSubQuery getLocalizedValueSubQuery(final Path<String> localizationKey, final Locale locale) {
@@ -375,14 +281,15 @@ public class LocalizationComponent implements LocalizationService {
      *            Key of LocalizedData to be locked.
      * @param locale
      *            Locale of LocalizedData to be locked.
-     * @return {@link List} of {@link LocalizedData} which are lock
+     * @return {@link List} of {@link LocalizedValue} which are lock
      */
-    private List<LocalizedData> getLockOnLocalizedData(final Connection connection, final QLocalizedData localizedData,
+    private List<LocalizedValue> getLockOnLocalizedData(final Connection connection,
+            final QLocalizedData localizedData,
             final String key, final Locale locale, final Configuration configuration) {
         SQLQuery query = new SQLQuery(connection, configuration);
         query.from(localizedData);
         query.where(localizedData.key_.eq(key).and(localizedData.locale_.eq(locale.toString())));
-        List<LocalizedData> result = query.forUpdate().list((ConstructorExpression.create(LocalizedData.class,
+        List<LocalizedValue> result = query.forUpdate().list((ConstructorExpression.create(LocalizedValue.class,
                 localizedData.key_,
                 localizedData.locale_,
                 localizedData.defaultLocale,
@@ -391,8 +298,8 @@ public class LocalizationComponent implements LocalizationService {
     }
 
     @Override
-    public Collection<Locale> getSupportedLocalesByKey(final String key) {
-        Map<Locale, LocalizedData> localizedDataMaps = getLocalizedDataMap(key);
+    public Collection<Locale> getSupportedLocalesOfKey(final String key) {
+        Map<Locale, LocalizedValue> localizedDataMaps = getLocalizedDataMap(key);
         Set<Locale> cloneSupportedLocales = new HashSet<Locale>();
         Set<Locale> supportedLocales = localizedDataMaps.keySet();
         for (Locale l : supportedLocales) {
@@ -402,17 +309,57 @@ public class LocalizationComponent implements LocalizationService {
     }
 
     @Override
-    public long removeLocalizedData(final String key, final Locale locale) {
-        Map<Locale, LocalizedData> localizedDataMap = getLocalizedDataMap(key);
-        LocalizedData removeData = localizedDataMap.get(locale);
+    public LocalizedValue getValue(final String key, final Locale locale) {
+        if (key == null) {
+            throw new IllegalArgumentException("Key cannot be null.");
+        }
+        if (locale == null) {
+            throw new IllegalArgumentException("Locale cannot be null.");
+        }
+
+        Map<Locale, LocalizedValue> localizedDataMap = getLocalizedDataMap(key);
+        if (localizedDataMap == null) {
+            return null;
+        }
+        LocalizedValue localizedData = localizedDataMap.get(locale);
+        if (localizedData == null) {
+            if (locale.getVariant() != "") {
+                String localeString = locale.getLanguage() + locale.getCountry();
+                localizedData = localizedDataMap.get(convertStringToLocale(localeString));
+            }
+            if ((localizedData == null) && (locale.getCountry() != "")) {
+                String localeString = locale.getLanguage();
+                localizedData = localizedDataMap.get(convertStringToLocale(localeString));
+            }
+            if (localizedData == null) {
+                for (LocalizedValue tmpLocalizedData : localizedDataMap.values()) {
+                    if (tmpLocalizedData.isDefaultLocale()) {
+                        return tmpLocalizedData;
+                    }
+                }
+            }
+        }
+        return localizedData;
+    }
+
+    @Override
+    public long removeKey(String key) {
+        // TODO Auto-generated method stub
+        return 0;
+    }
+
+    @Override
+    public void removeValue(final String key, final Locale locale) {
+        Map<Locale, LocalizedValue> localizedDataMap = getLocalizedDataMap(key);
+        LocalizedValue removeData = localizedDataMap.get(locale);
         if (removeData == null) {
-            return 0;
+            return;
         }
         if (removeData.isDefaultLocale() && (localizedDataMap.size() > 1)) {
             throw new IllegalArgumentException(ErrorCode.DEFAULT_LOCALE_CANNOT_BE_REMOVED);
         }
 
-        return querydslSupport.execute((connection, configuration) -> {
+        querydslSupport.execute((connection, configuration) -> {
             QLocalizedData localizedData = new QLocalizedData("qLocalizedData");
             SQLDeleteClause deleteClause = new SQLDeleteClause(connection, configuration, localizedData);
             deleteClause.where(localizedData.key_.eq(key).and(localizedData.locale_.eq(locale.toString())));
@@ -421,53 +368,43 @@ public class LocalizationComponent implements LocalizationService {
         });
     }
 
+    public void setCacheConfiguration(CacheConfiguration<String, Map<Locale, LocalizedValue>> cacheConfiguration) {
+        this.cacheConfiguration = cacheConfiguration;
+    }
+
+    public void setCacheFactory(final CacheFactory cacheFactory) {
+        this.cacheFactory = cacheFactory;
+    }
+
+    public void setLogService(final LogService logService) {
+        this.logService = logService;
+    }
+
+    public void setQuerydslSupport(QuerydslSupport querydslSupport) {
+        this.querydslSupport = querydslSupport;
+    }
+
+    public void setTransactionHelper(TransactionHelper transactionHelper) {
+        this.t = transactionHelper;
+    }
+
     @Override
-    public long updateLocalizedData(final String key, final Locale locale, final String value,
-            final boolean defaultLocale) {
-        return t.required(() -> {
+    public void updateValue(final String key, final Locale locale, final String value) {
+        t.required(() -> {
             return (Long) querydslSupport.execute((connection, configuration) -> {
                 QLocalizedData localizedData = new QLocalizedData("qLocalizedData");
-                List<LocalizedData> list =
+                List<LocalizedValue> list =
                         getLockOnLocalizedData(connection, localizedData, key, locale, configuration);
                 if (list.size() == 0) {
                     return 0;
                 }
 
-                if ((list.get(0).isDefaultLocale() != defaultLocale)
-                        && (list.get(0).isDefaultLocale() || defaultLocale)) {
-                    throw new LocalizationException(ErrorCode.DEFAULT_VALUE);
-                }
-
                 SQLUpdateClause updateClause = new SQLUpdateClause(connection, configuration, localizedData);
                 updateClause.where(localizedData.key_.eq(key).and(localizedData.locale_.eq(locale.toString())));
-                updateClause.set(localizedData.defaultLocale, defaultLocale);
                 updateClause.set(localizedData.value_, value);
                 localizedDataCache.remove(key);
                 return updateClause.execute();
             });
         });
-    }
-
-    @Override
-    public void updateLocalizedDataMap(final Map<String, LocalizedData> localizedDataMap) {
-        if (localizedDataMap == null) {
-            throw new IllegalArgumentException("localizedDataMap map cannot be null.");
-        }
-        String defaultLocalizedDataKey = "";
-        for (String key : localizedDataMap.keySet()) {
-            if (localizedDataMap.get(key).isDefaultLocale()) {
-                defaultLocalizedDataKey = key;
-                LocalizedData localizedData = localizedDataMap.get(key);
-                updateLocalizedData(localizedData.getKey(), localizedData.getLocale(), localizedData.getValue(),
-                        localizedData.isDefaultLocale());
-            }
-        } // Because we can not remove the defaultLocale.
-        for (String key : localizedDataMap.keySet()) {
-            if (!key.equals(defaultLocalizedDataKey)) {
-                LocalizedData localizedData = localizedDataMap.get(key);
-                updateLocalizedData(localizedData.getKey(), localizedData.getLocale(), localizedData.getValue(),
-                        localizedData.isDefaultLocale());
-            }
-        }
     }
 }

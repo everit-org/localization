@@ -17,73 +17,41 @@
 package org.everit.osgi.localization.api;
 
 import java.util.Collection;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-import org.everit.osgi.localization.api.dto.LocalizedData;
+import org.everit.osgi.localization.api.dto.LocalizedValue;
+
 import com.mysema.query.types.Expression;
 import com.mysema.query.types.Path;
+import com.mysema.query.types.expr.Coalesce;
 
 /**
  * Service for handling localized data.
  */
-public interface LocalizationService {
+public interface LocalizedDataStore {
 
     /**
-     * Clear the LocalizationService cache variable.
-     */
-    void clearCache();
-
-    /**
-     * Saving a new String based localized data with the given key and locale.
-     * 
+     * Saving a new String based localized data with the given key and locale. If there was no value for the specified
+     * key before, this value will be the default.
+     *
      * @param key
      *            The key of the data. If null throw IllegalArgumentException
      * @param locale
      *            The locale of the data. If null throw IllegalArgumentException
      * @param value
      *            The value of the data. If length more then 2000 throw IllegalArgumentException.
-     * @param defaultLocale
-     *            If true this will be the value of the default locale as well for the given key.
      * @return The created localized data.
      * @throws IllegalArgumentException
      *             if the key, locale or value is null or value is longer than 2000.
      */
-    LocalizedData createLocalizedData(String key, Locale locale, String value, boolean defaultLocale);
+    LocalizedValue addValue(String key, Locale locale, String value);
 
     /**
-     * Reads all the available locals from the database.
-     * 
-     * @return A Map of available locals ( en_GB - Great Britain )
+     * Clears the cache of the store. This should be only necessary if another module does a bulk update (e.g.: updating
+     * default locale for a set of records) that cannot be done via the API of this module.
      */
-    List<Locale> getAvailableLocales();
-
-    /**
-     * Getting a localized data by key.
-     * 
-     * @param key
-     *            The key of the localized data. If null throw IllegalArgumentException.
-     * @param locale
-     *            The locale we get the data based on. If null throw IllegalArgumentException.
-     * @return The localized data. If there is no data based on the given locale the default locale will be checked in
-     *         the same way as it is done in {@link java.util.ResourceBundle}. If there is no default locale null will
-     *         be returned.
-     * @throws IllegalArgumentException
-     *             if key or locale is null.
-     */
-    LocalizedData getLocalizedDataByKey(String key, Locale locale);
-
-    /**
-     * Clones the return value of the {@link #getLocalizedDataByKey(String, Locale)} method.
-     * 
-     * @param key
-     *            The key of the localized data. Cannot be null.
-     * @return The Map of the localized data by locale.
-     * @throws IllegalArgumentException
-     *             if the key is null.
-     */
-    Map<Locale, LocalizedData> getLocalizedDataMapClone(String key);
+    void clearCache();
 
     /**
      * Creates the expression with COALESCE of the localization value based on the localization key and locale. The
@@ -97,11 +65,11 @@ public interface LocalizationService {
      * query will return the localized value of column "a" with logic describe above. The LocalizedData table is the
      * representation of the {@link LocalizedDataEntity} entity.
      * </p>
-     * 
+     *
      * <pre>
      * SELECT x.a, x.b, x.c FROM x;
      * </pre>
-     * 
+     *
      * <pre>
      * SELECT
      * COALESCE(
@@ -110,62 +78,83 @@ public interface LocalizationService {
      * x.a)
      * x.b, x.c FROM x;
      * </pre>
-     * 
+     *
      * @param localizationKey
      *            {@link Path} for the localization key from "x" table.
      * @param locale
      *            {@link Locale} to be used in for the highest priority.
-     * 
+     *
      * @return {@link Expression} with coalesce subQueries.
      */
-    Expression<String> getLocalizedValue(final Path<String> localizationKey, final Locale locale);
+    Coalesce<String> generateLocalizedExpression(final Path<String> localizationKey, final Locale locale);
+
+    /**
+     * Clones the return value of the {@link #getValue(String, Locale)} method.
+     *
+     * @param key
+     *            The key of the localized data. Cannot be null.
+     * @return The Map of the localized data by locale.
+     * @throws IllegalArgumentException
+     *             if the key is null.
+     */
+    Map<Locale, LocalizedValue> getLocalizedValuesByKey(String key);
 
     /**
      * Getting the list of locals that are available for the given key.
-     * 
+     *
      * @param key
      *            The key of the localized data.
      * @return The available locals.
      */
-    Collection<Locale> getSupportedLocalesByKey(String key);
+    Collection<Locale> getSupportedLocalesOfKey(String key);
 
     /**
-     * Removes a localized data by it's key and locale.
-     * 
+     * Getting a localized data by key.
+     *
      * @param key
-     *            The key of the localized data.
+     *            The key of the localized data. If null throw IllegalArgumentException.
      * @param locale
-     *            The locale of the data.
-     * @return The number of rows affected.
+     *            The locale we get the data based on. If null throw IllegalArgumentException.
+     * @return The localized data. If there is no data based on the given locale the default locale will be checked in
+     *         the same way as it is done in {@link java.util.ResourceBundle}. If there is no default locale null will
+     *         be returned.
+     * @throws IllegalArgumentException
+     *             if key or locale is null.
      */
-    long removeLocalizedData(String key, Locale locale);
+    LocalizedValue getValue(String key, Locale locale);
+
+    /**
+     * Removes all values that belong the a specific key.
+     *
+     * @param key
+     *            The key.
+     * @return The number of records that were deleted. In other words: The number of locales that were specified for
+     *         the key.
+     */
+    long removeKey(String key);
+
+    /**
+     * Removes a localized value from the store. If there is no such value, the function has no effect.
+     *
+     * @param key
+     *            The key of the localized value.
+     * @param locale
+     *            The {@link Locale} of the value.
+     */
+    void removeValue(String key, Locale locale);
 
     /**
      * Updating an existing String based localized data. The localized data is identified by it's key and locale.
-     * 
+     *
      * @param key
      *            The key of the data. If null throw IllegalArgumentException
      * @param locale
      *            The locale of the data. If null throw IllegalArgumentException
      * @param value
      *            The value of the data. Maximum length is 2000 if more throw IllegalArgumentException.
-     * @param defaultLocale
-     *            If true this will be the value of the default locale as well for the given key.
      * @return The number of rows affected during update.
      * @throws IllegalArgumentException
      *             if the key, locale or value is null or value is longer than 2000.
      */
-    long updateLocalizedData(String key, Locale locale, String value, boolean defaultLocale);
-
-    /**
-     * Updating more existing String based localized data. First search the default data and update, after that update
-     * the other data.
-     * 
-     * @param localizedDataMap
-     *            The map contains the localized datas. The map key is the locale. If a localizedData not exist with the
-     *            given key.
-     * @throws IllegalArgumentException
-     *             If the localizedDataMap is null.
-     */
-    void updateLocalizedDataMap(Map<String, LocalizedData> localizedDataMap);
+    void updateValue(String key, Locale locale, String value);
 }

@@ -21,7 +21,7 @@ import java.util.Locale;
 /**
  * DTO class of a localized data.
  */
-public class LocalizedData {
+public class LocalizedValue {
 
     /**
      * The key of the data.
@@ -46,7 +46,7 @@ public class LocalizedData {
     /**
      * Default constructor.
      */
-    public LocalizedData() {
+    public LocalizedValue() {
         key = null;
         locale = null;
         defaultLocale = false;
@@ -65,7 +65,7 @@ public class LocalizedData {
      * @param value
      *            The localized value.
      */
-    public LocalizedData(final String key, final Locale locale, final boolean defaultLocale,
+    public LocalizedValue(final String key, final Locale locale, final boolean defaultLocale,
             final String value) {
         super();
         this.key = key;
@@ -86,7 +86,7 @@ public class LocalizedData {
      * @param value
      *            The localized value.
      */
-    public LocalizedData(final String key, final String locale, final boolean defaultLocale,
+    public LocalizedValue(final String key, final String locale, final boolean defaultLocale,
             final String value) {
         super();
         this.key = key;
@@ -106,7 +106,7 @@ public class LocalizedData {
         if (getClass() != obj.getClass()) {
             return false;
         }
-        LocalizedData other = (LocalizedData) obj;
+        LocalizedValue other = (LocalizedValue) obj;
         if (defaultLocale != other.defaultLocale) {
             return false;
         }

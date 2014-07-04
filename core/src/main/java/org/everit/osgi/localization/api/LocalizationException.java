@@ -26,28 +26,8 @@ public class LocalizationException extends RuntimeException {
      */
     private static final long serialVersionUID = -9085836630544428292L;
 
-    /**
-     * Default constructor.
-     */
-    public LocalizationException() {
-        super();
-    }
-
     public LocalizationException(final String message) {
         super(message);
-    }
-
-    public LocalizationException(final String message, final Throwable cause) {
-        super(message, cause);
-    }
-
-    public LocalizationException(final String message, final Throwable cause, final boolean enableSuppression,
-            final boolean writableStackTrace) {
-        super(message, cause, enableSuppression, writableStackTrace);
-    }
-
-    public LocalizationException(final Throwable cause) {
-        super(cause);
     }
 
 }

@@ -16,11 +16,11 @@
  */
 package org.everit.osgi.localization.tests;
 
-import org.everit.osgi.localization.api.LocalizationService;
+import org.everit.osgi.localization.api.LocalizedDataStore;
 import org.junit.Test;
 
 /**
- * Test component for testing {@link LocalizationService} methods.
+ * Test component for testing {@link LocalizedDataStore} methods.
  */
 // @Component(name = "LocalizationTest", immediate = true, metatype = true, policy = ConfigurationPolicy.REQUIRE)
 // @Service(value = LocalizationTestComponent.class)
