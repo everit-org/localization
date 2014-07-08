@@ -16,22 +16,37 @@
  */
 package org.everit.osgi.localization.tests;
 
+import java.util.Locale;
+
+import org.apache.felix.scr.annotations.Component;
+import org.apache.felix.scr.annotations.Properties;
+import org.apache.felix.scr.annotations.Property;
+import org.apache.felix.scr.annotations.Reference;
+import org.apache.felix.scr.annotations.Service;
+import org.everit.osgi.dev.testrunner.TestDuringDevelopment;
 import org.everit.osgi.localization.api.LocalizedDataStore;
 import org.junit.Test;
 
 /**
  * Test component for testing {@link LocalizedDataStore} methods.
  */
-// @Component(name = "LocalizationTest", immediate = true, metatype = true, policy = ConfigurationPolicy.REQUIRE)
-// @Service(value = LocalizationTestComponent.class)
-// @Properties({ @Property(name = "eosgi.testEngine", value = "junit4"),
-// @Property(name = "eosgi.testId", value = "localizationTest"),
-// @Property(name = "dataSource.target"),
-// @Property(name = "logSource.target") })
+@Component(name = "LocalizationTest", immediate = true, metatype = true)
+@Service(value = LocalizationTestComponent.class)
+@Properties({ @Property(name = "eosgi.testEngine", value = "junit4"),
+        @Property(name = "eosgi.testId", value = "localizationTest") })
+@TestDuringDevelopment
 public class LocalizationTestComponent {
+
+    @Reference
+    private LocalizedDataStore LocalizedDataStore;
+
+    public void bindLocalizedDataStore(LocalizedDataStore localizedDataStore) {
+        LocalizedDataStore = localizedDataStore;
+    }
 
     @Test
     public void test() {
+        LocalizedDataStore.addValue("testKey", Locale.ENGLISH, "testValue");
 
     }
 }

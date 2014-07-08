@@ -24,6 +24,11 @@ import java.util.Locale;
 public class LocalizedValue {
 
     /**
+     * Locale is default or not.
+     */
+    private final boolean defaultLocale;
+
+    /**
      * The key of the data.
      */
     private final String key;
@@ -32,11 +37,6 @@ public class LocalizedValue {
      * Locale of the attribute.
      */
     private final Locale locale;
-
-    /**
-     * Locale is default or not.
-     */
-    private final boolean defaultLocale;
 
     /**
      * The localized value.
@@ -55,7 +55,7 @@ public class LocalizedValue {
 
     /**
      * Public constructor for LocalizedData.
-     * 
+     *
      * @param key
      *            The key of the data.
      * @param locale
@@ -76,7 +76,7 @@ public class LocalizedValue {
 
     /**
      * Public constructor with String locale.
-     * 
+     *
      * @param key
      *            The key of the data.
      * @param locale
@@ -88,7 +88,6 @@ public class LocalizedValue {
      */
     public LocalizedValue(final String key, final String locale, final boolean defaultLocale,
             final String value) {
-        super();
         this.key = key;
         this.locale = new Locale(locale);
         this.defaultLocale = defaultLocale;

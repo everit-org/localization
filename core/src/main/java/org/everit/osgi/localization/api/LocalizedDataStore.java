@@ -27,7 +27,7 @@ import com.mysema.query.types.Path;
 import com.mysema.query.types.expr.Coalesce;
 
 /**
- * Service for handling localized data.
+ * A service that makes it possible to store localized key-value pairs. Keys and values have the type
  */
 public interface LocalizedDataStore {
 
@@ -106,7 +106,7 @@ public interface LocalizedDataStore {
      *            The key of the localized data.
      * @return The available locals.
      */
-    Collection<Locale> getSupportedLocalesOfKey(String key);
+    Collection<Locale> getSupportedLocalesForKey(String key);
 
     /**
      * Getting a localized data by key.
@@ -114,7 +114,7 @@ public interface LocalizedDataStore {
      * @param key
      *            The key of the localized data. If null throw IllegalArgumentException.
      * @param locale
-     *            The locale we get the data based on. If null throw IllegalArgumentException.
+     *            Null means default locale.
      * @return The localized data. If there is no data based on the given locale the default locale will be checked in
      *         the same way as it is done in {@link java.util.ResourceBundle}. If there is no default locale null will
      *         be returned.

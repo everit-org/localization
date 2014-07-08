@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with Everit - Localization.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.everit.osgi.localization.schema;
+package org.everit.osgi.localization.schema.qdsl;
 
 import static com.mysema.query.types.PathMetadataFactory.*;
 
@@ -35,24 +35,26 @@ import com.mysema.query.sql.ColumnMetadata;
 @Generated("com.mysema.query.sql.codegen.MetaDataSerializer")
 public class QLocalizedData extends com.mysema.query.sql.RelationalPathBase<QLocalizedData> {
 
-    private static final long serialVersionUID = -556535143;
+    private static final long serialVersionUID = 1426427121;
 
-    public static final QLocalizedData localizedData = new QLocalizedData("localized_data");
+    public static final QLocalizedData localizedData = new QLocalizedData("loc_data");
 
-    public final BooleanPath defaultLocale = createBoolean("defaultLocale");
+    public class PrimaryKeys {
+
+        public final com.mysema.query.sql.PrimaryKey<QLocalizedData> locDataPk = createPrimaryKey(key_, locale_);
+
+    }
 
     public final StringPath key_ = createString("key_");
 
     public final StringPath locale_ = createString("locale_");
 
-    public final NumberPath<Long> localizedDataId = createNumber("localizedDataId", Long.class);
-
     public final StringPath value_ = createString("value_");
 
-    public final com.mysema.query.sql.PrimaryKey<QLocalizedData> localizedDataPk = createPrimaryKey(localizedDataId);
+    public final PrimaryKeys pk = new PrimaryKeys();
 
     public QLocalizedData(String variable) {
-        super(QLocalizedData.class, forVariable(variable), "org.everit.osgi.localization.schema", "localized_data");
+        super(QLocalizedData.class, forVariable(variable), "org.everit.osgi.localization", "loc_data");
         addMetadata();
     }
 
@@ -62,20 +64,18 @@ public class QLocalizedData extends com.mysema.query.sql.RelationalPathBase<QLoc
     }
 
     public QLocalizedData(Path<? extends QLocalizedData> path) {
-        super(path.getType(), path.getMetadata(), "org.everit.osgi.localization.schema", "localized_data");
+        super(path.getType(), path.getMetadata(), "org.everit.osgi.localization", "loc_data");
         addMetadata();
     }
 
     public QLocalizedData(PathMetadata<?> metadata) {
-        super(QLocalizedData.class, metadata, "org.everit.osgi.localization.schema", "localized_data");
+        super(QLocalizedData.class, metadata, "org.everit.osgi.localization", "loc_data");
         addMetadata();
     }
 
     public void addMetadata() {
-        addMetadata(defaultLocale, ColumnMetadata.named("default_locale").ofType(16).withSize(1).notNull());
-        addMetadata(key_, ColumnMetadata.named("key_").ofType(12).withSize(255));
-        addMetadata(locale_, ColumnMetadata.named("locale_").ofType(12).withSize(10));
-        addMetadata(localizedDataId, ColumnMetadata.named("localized_data_id").ofType(-5).withSize(19).notNull());
+        addMetadata(key_, ColumnMetadata.named("key_").ofType(12).withSize(255).notNull());
+        addMetadata(locale_, ColumnMetadata.named("locale_").ofType(12).withSize(20).notNull());
         addMetadata(value_, ColumnMetadata.named("value_").ofType(12).withSize(2000));
     }
 

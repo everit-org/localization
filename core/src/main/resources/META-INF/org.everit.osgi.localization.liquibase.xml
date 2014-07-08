@@ -23,25 +23,28 @@
   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.0.xsd
         http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
 
-  <changeSet id="1" author="everit">
-    <sql dbms="h2">CREATE SCHEMA IF NOT EXISTS "org.everit.osgi.localization.schema"</sql>
-    <sql dbms="postgresql">CREATE SCHEMA "org.everit.osgi.localization.schema"</sql>
-
-    <createTable tableName="localized_data" schemaName="org.everit.osgi.localization.schema">
-      <column name="localized_data_id" type="bigint" autoIncrement="true">
-        <constraints primaryKey="true" nullable="false"  />
+  <changeSet id="1.0.0_10" author="everit">
+    <createTable tableName="loc_default_locale">
+      <column name="key_" type="varchar(255)">
+        <constraints nullable="false" primaryKey="true" primaryKeyName="pk_loc_default_locale" />
       </column>
-      <column name="default_locale" type="boolean" >
+      <column name="default_locale" type="varchar(20)">
         <constraints nullable="false" />
       </column>
-      <column name="key_" type="varchar(255)" />
-      <column name="locale_" type="varchar(10)" />
-      <column name="value_" type="varchar(2000)" />
-<!--            TODO fix uniqueConstrint syntax -->
     </createTable>
-    <addUniqueConstraint columnNames="key_, locale_" constraintName="unique_key_locale"
-        schemaName="org.everit.osgi.localization.schema" tableName="localized_data" />
   </changeSet>
 
+  <changeSet id="1.0.0_20" author="everit">
+    <createTable tableName="loc_data">
+      <column name="key_" type="varchar(255)">
+        <constraints nullable="false" />
+      </column>
+      <column name="locale_" type="varchar(20)">
+        <constraints nullable="false" />
+      </column>
+      <column name="value_" type="varchar(2000)" />
+    </createTable>
+    <addPrimaryKey tableName="loc_data" columnNames="key_, locale_" constraintName="pk_loc_data" />
+  </changeSet>
 </databaseChangeLog>
 
