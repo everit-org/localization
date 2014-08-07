@@ -88,9 +88,8 @@
               *
             </Import-Package>
             <Export-Package>
-              ${project.artifactId}.api,
-              ${project.artifactId}.api.dto,
-              ${project.artifactId}.schema
+              org.everit.osgi.localization,
+              org.everit.osgi.localization.schema.qdsl
             </Export-Package>
             <Provide-Capability>
               liquibase.schema;name=org.everit.osgi.localization;resource=/META-INF/org.everit.osgi.localization.liquibase.xml;lqmg.config.resource=/META-INF/org.everit.osgi.localization.lqmg.xml

@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with Everit - Localization.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.everit.osgi.localization.internal;
+package org.everit.osgi.localization.ri.internal;
 
 import java.util.Collection;
 import java.util.Locale;
@@ -32,10 +32,11 @@ import org.apache.felix.scr.annotations.Service;
 import org.everit.osgi.cache.api.CacheConfiguration;
 import org.everit.osgi.cache.api.CacheFactory;
 import org.everit.osgi.cache.api.CacheHolder;
-import org.everit.osgi.localization.api.LocalizedDataStore;
-import org.everit.osgi.localization.api.dto.LocalizedValue;
+import org.everit.osgi.localization.LocalizedDataStore;
+import org.everit.osgi.localization.dto.LocalizedValue;
 import org.everit.osgi.localization.schema.qdsl.QDefaultLocale;
 import org.everit.osgi.localization.schema.qdsl.QLocalizedData;
+import org.everit.osgi.localization.schema.qdsl.util.LocalizationQdslUtil;
 import org.everit.osgi.querydsl.support.QuerydslSupport;
 import org.everit.osgi.transaction.helper.api.TransactionHelper;
 import org.osgi.framework.BundleContext;
@@ -56,7 +57,7 @@ import com.mysema.query.types.expr.Coalesce;
         @Property(name = "cacheFactory.target"), @Property(name = "logService.target"),
         @Property(name = "transactionHelper.target") })
 @Service
-public class LocalizationComponent implements LocalizedDataStore {
+public class LocalizationComponent implements LocalizedDataStore, LocalizationQdslUtil {
 
     /**
      * {@link CacheConfiguration}.

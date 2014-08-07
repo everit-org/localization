@@ -28,7 +28,7 @@
       <column name="key_" type="varchar(255)">
         <constraints nullable="false" primaryKey="true" primaryKeyName="pk_loc_default_locale" />
       </column>
-      <column name="default_locale" type="varchar(20)">
+      <column name="locale_" type="varchar(20)">
         <constraints nullable="false" />
       </column>
     </createTable>

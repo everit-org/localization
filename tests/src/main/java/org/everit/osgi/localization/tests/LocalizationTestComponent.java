@@ -24,7 +24,7 @@ import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.Service;
 import org.everit.osgi.dev.testrunner.TestDuringDevelopment;
-import org.everit.osgi.localization.api.LocalizedDataStore;
+import org.everit.osgi.localization.LocalizedDataStore;
 import org.junit.Test;
 
 /**

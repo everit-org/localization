@@ -14,17 +14,10 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with Everit - Localization.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.everit.osgi.localization.api;
+package org.everit.osgi.localization;
 
-import java.util.Collection;
 import java.util.Locale;
-import java.util.Map;
-
-import org.everit.osgi.localization.api.dto.LocalizedValue;
-
-import com.mysema.query.types.Expression;
-import com.mysema.query.types.Path;
-import com.mysema.query.types.expr.Coalesce;
+import java.util.ResourceBundle;
 
 /**
  * A service that makes it possible to store localized key-value pairs. Keys and values have the type
@@ -45,7 +38,7 @@ public interface LocalizedDataStore {
      * @throws IllegalArgumentException
      *             if the key, locale or value is null or value is longer than 2000.
      */
-    LocalizedValue addValue(String key, Locale locale, String value);
+    void addValue(String key, Locale locale, String value);
 
     /**
      * Clears the cache of the store. This should be only necessary if another module does a bulk update (e.g.: updating
@@ -53,51 +46,7 @@ public interface LocalizedDataStore {
      */
     void clearCache();
 
-    /**
-     * Creates the expression with COALESCE of the localization value based on the localization key and locale. The
-     * coalesce query is built in the following order: If there is a localization key available on the locale, then its
-     * value will be returned. If there is no localization key available on the locale, then the value of the default
-     * locale will be returned. If there is no default locale available, then the localization key will be returned.
-     * <p/>
-     * <p>
-     * The following example demonstrates the result of using this method. The first SQL statement simply queries the
-     * columns "a", "b" and "c" from table "x". The second SQL statement queries the same as the previous except the
-     * query will return the localized value of column "a" with logic describe above. The LocalizedData table is the
-     * representation of the {@link LocalizedDataEntity} entity.
-     * </p>
-     *
-     * <pre>
-     * SELECT x.a, x.b, x.c FROM x;
-     * </pre>
-     *
-     * <pre>
-     * SELECT
-     * COALESCE(
-     * SELECT ld.data FROM LocalizedData ld WHERE ld.key = x.a AND ld.locale = ‘hu_HU’),
-     * SELECT ld.data FROM LocalizedData ld WHERE ld.key = x.a AND ld.default = true),
-     * x.a)
-     * x.b, x.c FROM x;
-     * </pre>
-     *
-     * @param localizationKey
-     *            {@link Path} for the localization key from "x" table.
-     * @param locale
-     *            {@link Locale} to be used in for the highest priority.
-     *
-     * @return {@link Expression} with coalesce subQueries.
-     */
-    Coalesce<String> generateLocalizedExpression(final Path<String> localizationKey, final Locale locale);
-
-    /**
-     * Clones the return value of the {@link #getValue(String, Locale)} method.
-     *
-     * @param key
-     *            The key of the localized data. Cannot be null.
-     * @return The Map of the localized data by locale.
-     * @throws IllegalArgumentException
-     *             if the key is null.
-     */
-    Map<Locale, LocalizedValue> getLocalizedValuesByKey(String key);
+    String getExactValue(String key, Locale locale);
 
     /**
      * Getting the list of locals that are available for the given key.
@@ -106,22 +55,25 @@ public interface LocalizedDataStore {
      *            The key of the localized data.
      * @return The available locals.
      */
-    Collection<Locale> getSupportedLocalesForKey(String key);
+    Locale[] getSupportedLocalesForKey(String key);
 
     /**
-     * Getting a localized data by key.
+     * Getting a localized string by key the and locale. If the requested string is not available in the specified
+     * locale, the locale will be cropped in the same way as {@link ResourceBundle} does. E.g.: If the locale en_GB is
+     * queried, first the original locale is checked, than the 'en' than the default locale. If non of them exists, the
+     * key is returned.
      *
      * @param key
-     *            The key of the localized data. If null throw IllegalArgumentException.
+     *            The key of the localized data.
      * @param locale
      *            Null means default locale.
      * @return The localized data. If there is no data based on the given locale the default locale will be checked in
-     *         the same way as it is done in {@link java.util.ResourceBundle}. If there is no default locale null will
-     *         be returned.
-     * @throws IllegalArgumentException
-     *             if key or locale is null.
+     *         the same way as it is done in {@link java.util.ResourceBundle}. If there is no default locale, the key
+     *         will be returned.
+     * @throws NullPointerException
+     *             if key is null.
      */
-    LocalizedValue getValue(String key, Locale locale);
+    String getValue(String key, Locale locale);
 
     /**
      * Removes all values that belong the a specific key.
@@ -130,6 +82,8 @@ public interface LocalizedDataStore {
      *            The key.
      * @return The number of records that were deleted. In other words: The number of locales that were specified for
      *         the key.
+     * @throws NullPointerException
+     *             if key is null.
      */
     long removeKey(String key);
 
@@ -144,7 +98,7 @@ public interface LocalizedDataStore {
     void removeValue(String key, Locale locale);
 
     /**
-     * Updating an existing String based localized data. The localized data is identified by it's key and locale.
+     * Updating an existing String based localized data. The localized data is identified by its key and locale.
      *
      * @param key
      *            The key of the data. If null throw IllegalArgumentException
