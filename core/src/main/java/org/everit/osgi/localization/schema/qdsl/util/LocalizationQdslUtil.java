@@ -26,7 +26,7 @@ public interface LocalizationQdslUtil {
      * <pre>
      * SELECT
      * COALESCE(
-     * SELECT ld.data FROM LocalizedData ld WHERE ld.key = x.a AND ld.locale = ‘hu_HU’),
+     * SELECT ld.data FROM LocalizedData ld WHERE ld.key = x.a AND ld.locale = ‘hu-HU’),
      * SELECT ld.data FROM LocalizedData ld WHERE ld.key = x.a AND ld.locale = ‘hu’),
      * SELECT ld.data FROM LocalizedData ld WHERE ld.key = x.a AND ld.default = true),
      * x.a)
@@ -40,5 +40,5 @@ public interface LocalizationQdslUtil {
      *
      * @return {@link Expression} with coalesce subQueries.
      */
-    Coalesce<String> generateLocalizedExpression(final Path<String> localizationKey, final Locale locale);
+    Coalesce<String> localize(Path<String> localizationKey, Locale locale);
 }

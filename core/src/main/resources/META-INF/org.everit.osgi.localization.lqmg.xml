@@ -21,10 +21,34 @@
     <classNameRule>
       <entity>loc_data</entity>
       <class>LocalizedData</class>
+      <propertyMappings>
+        <primaryKey>
+          <name>pk_loc_data</name>
+          <property>localizedDataPK</property>
+        </primaryKey>
+        <column>
+          <name>key_</name>
+          <property>key</property>
+        </column>
+        <column>
+          <name>value_</name>
+          <property>value</property>
+        </column>
+      </propertyMappings>
     </classNameRule>
     <classNameRule>
       <entity>loc_default_locale</entity>
       <class>DefaultLocale</class>
+      <propertyMappings>
+        <primaryKey>
+          <name>pk_loc_default_locale</name>
+          <property>defaultLocalePK</property>
+        </primaryKey>
+        <column>
+          <name>key_</name>
+          <property>key</property>
+        </column>
+      </propertyMappings>
     </classNameRule>
   </namingRules>
 </lqmg>

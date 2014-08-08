@@ -24,11 +24,11 @@ import org.apache.felix.scr.annotations.Property;
 import org.apache.felix.scr.annotations.Reference;
 import org.apache.felix.scr.annotations.Service;
 import org.everit.osgi.dev.testrunner.TestDuringDevelopment;
-import org.everit.osgi.localization.LocalizedDataStore;
+import org.everit.osgi.localization.Localization;
 import org.junit.Test;
 
 /**
- * Test component for testing {@link LocalizedDataStore} methods.
+ * Test component for testing {@link Localization} methods.
  */
 @Component(name = "LocalizationTest", immediate = true, metatype = true)
 @Service(value = LocalizationTestComponent.class)
@@ -38,9 +38,9 @@ import org.junit.Test;
 public class LocalizationTestComponent {
 
     @Reference
-    private LocalizedDataStore LocalizedDataStore;
+    private Localization LocalizedDataStore;
 
-    public void bindLocalizedDataStore(LocalizedDataStore localizedDataStore) {
+    public void bindLocalizedDataStore(Localization localizedDataStore) {
         LocalizedDataStore = localizedDataStore;
     }
 

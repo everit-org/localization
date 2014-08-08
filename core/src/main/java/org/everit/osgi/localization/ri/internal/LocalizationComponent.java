@@ -16,9 +16,12 @@
  */
 package org.everit.osgi.localization.ri.internal;
 
-import java.util.Collection;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
-import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentMap;
 
 import org.apache.felix.scr.annotations.Activate;
@@ -32,38 +35,46 @@ import org.apache.felix.scr.annotations.Service;
 import org.everit.osgi.cache.api.CacheConfiguration;
 import org.everit.osgi.cache.api.CacheFactory;
 import org.everit.osgi.cache.api.CacheHolder;
-import org.everit.osgi.localization.LocalizedDataStore;
-import org.everit.osgi.localization.dto.LocalizedValue;
+import org.everit.osgi.localization.Localization;
 import org.everit.osgi.localization.schema.qdsl.QDefaultLocale;
 import org.everit.osgi.localization.schema.qdsl.QLocalizedData;
 import org.everit.osgi.localization.schema.qdsl.util.LocalizationQdslUtil;
 import org.everit.osgi.querydsl.support.QuerydslSupport;
 import org.everit.osgi.transaction.helper.api.TransactionHelper;
 import org.osgi.framework.BundleContext;
-import org.osgi.framework.wiring.BundleWiring;
+import org.osgi.framework.Constants;
 import org.osgi.service.log.LogService;
 
+import com.mysema.query.Tuple;
 import com.mysema.query.sql.SQLQuery;
 import com.mysema.query.sql.dml.SQLInsertClause;
 import com.mysema.query.types.Path;
 import com.mysema.query.types.expr.Coalesce;
 
 /**
- * Implementation for {@link LocalizedDataStore}.
+ * Implementation for {@link Localization}.
  */
-@Component(name = "org.everit.osgi.localization.LocalizatedDataStore", metatype = true, configurationFactory = true,
+@Component(name = "org.everit.osgi.localization.Localization", metatype = true, configurationFactory = true,
         policy = ConfigurationPolicy.REQUIRE)
-@Properties({ @Property(name = "querydslSupport.target"), @Property(name = "cacheConfiguration.target"),
-        @Property(name = "cacheFactory.target"), @Property(name = "logService.target"),
-        @Property(name = "transactionHelper.target") })
+@Properties({ @Property(name = "querydslSupport.target"), @Property(name = "cacheFactory.target"),
+        @Property(name = "cacheConfiguration.target"), @Property(name = "transactionHelper.target"),
+        @Property(name = "logService.target"),
+        @Property(name = Constants.SERVICE_DESCRIPTION, propertyPrivate = false) })
 @Service
-public class LocalizationComponent implements LocalizedDataStore, LocalizationQdslUtil {
+public class LocalizationComponent implements Localization, LocalizationQdslUtil {
 
+    /**
+     * Caching that is used in front of the entity manager. The localizedDataCache is based on the key of the localized
+     * data. When a new localized data is created or an existing is updated based on a key all of the localized data
+     * will be deleted belonging to the specified key.
+     */
+    private ConcurrentMap<String, LocalizedValue[]> cache;
     /**
      * {@link CacheConfiguration}.
      */
     @Reference(bind = "setCacheConfiguration")
-    private CacheConfiguration<String, Map<Locale, LocalizedValue>> cacheConfiguration;
+    private CacheConfiguration<String, LocalizedValue[]> cacheConfiguration;
+
     /**
      * {@link CacheFactory}.
      */
@@ -73,14 +84,7 @@ public class LocalizationComponent implements LocalizedDataStore, LocalizationQd
     /**
      * {@link CacheHolder}.
      */
-    private CacheHolder<String, Map<Locale, LocalizedValue>> cacheHolder;
-
-    /**
-     * Caching that is used in front of the entity manager. The localizedDataCache is based on the key of the localized
-     * data. When a new localized data is created or an existing is updated based on a key all of the localized data
-     * will be deleted belonging to the specified key.
-     */
-    private ConcurrentMap<String, Map<Locale, LocalizedValue>> localizedDataCache;
+    private CacheHolder<String, LocalizedValue[]> cacheHolder;
 
     /**
      * {@link LogService}.
@@ -96,35 +100,27 @@ public class LocalizationComponent implements LocalizedDataStore, LocalizationQd
 
     @Activate
     public void activate(final BundleContext context) {
-        BundleWiring bundleWiring = context.getBundle().adapt(BundleWiring.class);
-        ClassLoader classLoader = bundleWiring.getClassLoader();
-        cacheHolder = cacheFactory.createCache(cacheConfiguration, classLoader);
-        localizedDataCache = cacheHolder.getCache();
+        cacheHolder = cacheFactory.createCache(cacheConfiguration, LocalizedValue.class.getClassLoader());
+        cache = cacheHolder.getCache();
     }
 
     @Override
-    public LocalizedValue addValue(String key, Locale locale, String value) {
-        return t.required(() -> {
-            LocalizedValue insertedValue = addValueInTransaction(key, locale, value);
-            localizedDataCache.remove(key);
-            return insertedValue;
-        });
-    }
+    public void addValue(String key, Locale locale, String value) {
+        String languageTag = locale.toLanguageTag();
+        t.required(() -> {
+            boolean existed = lockOnKey(key);
+            if (!existed) {
+                insertDefaultLocaleToDB(key, languageTag);
+            }
 
-    private LocalizedValue addValueInTransaction(final String key, final Locale locale, final String value) {
-        insertValueToDatabase(key, locale, value);
-        String defaultLocale = lockDefaultLocaleInDatabase(key);
-        if (defaultLocale == null) {
-            insertDefaultLocaleIntoDatabase(key, locale.toLanguageTag());
-            return new LocalizedValue(key, locale, true, value);
-        } else {
-            return new LocalizedValue(key, locale, false, value);
-        }
+            return null;
+        });
+
     }
 
     @Override
     public void clearCache() {
-        localizedDataCache.clear();
+        cache.clear();
     }
 
     @Deactivate
@@ -133,64 +129,127 @@ public class LocalizationComponent implements LocalizedDataStore, LocalizationQd
     }
 
     @Override
-    public Coalesce<String> generateLocalizedExpression(final Path<String> localizationKey, final Locale locale) {
-        // TODO
+    public Optional<String> getExactValue(String key, Locale locale) {
+        Objects.requireNonNull(key, "Key must not be null");
+        Objects.requireNonNull(locale, "Value must not be null");
+
+        LocalizedValue[] localizedValues = getLocalizedValues(key);
+        if (localizedValues == null) {
+            return Optional.empty();
+        }
+
+        String result = null;
+        String languageTag = locale.toLanguageTag();
+        for (int i = 0, n = localizedValues.length; result == null && i < n; i++) {
+            if (localizedValues[i].getLanguageTag().equals(languageTag)) {
+                result = localizedValues[i].getValue();
+            }
+        }
+        return Optional.ofNullable(result);
+    }
+
+    private LocalizedValue[] getLocalizedValues(String key) {
+        LocalizedValue[] cachedLocalizedValues = cache.get(key);
+        if (cachedLocalizedValues != null) {
+            return cachedLocalizedValues;
+        }
+        // If localized values are not in the cache, read them from DB in the way that after putting them into the
+        // cache, they should be the same if we read them again from the database.
+        return t.notSupported(() -> {
+            LocalizedValue[] dbLocalizedValues = readSortedLocalizedValuesFromDB(key);
+            cache.put(key, dbLocalizedValues);
+            LocalizedValue[] newDbLocalizedValues = readSortedLocalizedValuesFromDB(key);
+            while (!Arrays.equals(dbLocalizedValues, newDbLocalizedValues)) {
+                dbLocalizedValues = newDbLocalizedValues;
+                cache.put(key, dbLocalizedValues);
+                newDbLocalizedValues = readSortedLocalizedValuesFromDB(key);
+            }
+
+            return dbLocalizedValues;
+        });
+    }
+
+    @Override
+    public Locale[] getSupportedLocalesForKey(String key) {
+        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public Map<Locale, LocalizedValue> getLocalizedValuesByKey(final String key) {
-        // TODO
+    public String getValue(String key, Locale locale) {
+        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
-    public Collection<Locale> getSupportedLocalesForKey(final String key) {
-        // TODO
+    public String getValue(String key, Locale locale, String defaultValue) {
+        // TODO Auto-generated method stub
         return null;
     }
 
-    @Override
-    public LocalizedValue getValue(final String key, final Locale locale) {
-        return null;
-    }
+    private void insertDefaultLocaleToDB(String key, String languageTag) {
 
-    private void insertDefaultLocaleIntoDatabase(String key, String languageTag) {
         querydslSupport.execute((connection, configuration) -> {
-            QDefaultLocale defaultLocale = QDefaultLocale.defaultLocale1;
+            QDefaultLocale defaultLocale = QDefaultLocale.defaultLocale;
+
             SQLInsertClause insert = new SQLInsertClause(connection, configuration, defaultLocale);
-            insert.set(defaultLocale.key_, key).set(defaultLocale.defaultLocale, languageTag).execute();
+            insert.set(defaultLocale.key, key).set(defaultLocale.languageTag, languageTag).execute();
             return null;
         });
     }
 
-    private void insertValueToDatabase(String key, Locale locale, String value) {
-        querydslSupport.execute((connection, configuration) -> {
-            QLocalizedData localizedData = QLocalizedData.localizedData;
-            SQLInsertClause insertLocalizedData = new SQLInsertClause(connection, configuration, localizedData);
-            insertLocalizedData.set(localizedData.key_, key).set(localizedData.locale_, locale.toLanguageTag())
-                    .set(localizedData.value_, value).execute();
-
-            return null;
-        });
+    @Override
+    public Coalesce<String> localize(Path<String> localizationKey, Locale locale) {
+        // TODO Auto-generated method stub
+        return null;
     }
 
-    /**
-     * Locks (pessimistic) the default locale record for the specified key. This method should be called within a
-     * transaction.
-     *
-     * @param key
-     *            The key of the localized value.
-     * @return The current default locale if there was record to lock or null if there was no record to lock.
-     */
-    private String lockDefaultLocaleInDatabase(String key) {
+    private boolean lockOnKey(String key) {
         return querydslSupport.execute((connection, configuration) -> {
+            QDefaultLocale defaultLocale = QDefaultLocale.defaultLocale;
             SQLQuery query = new SQLQuery(connection, configuration);
-            QDefaultLocale defaultLocale = QDefaultLocale.defaultLocale1;
-            return query.from(defaultLocale).where(defaultLocale.key_.eq(key)).forUpdate()
-                    .uniqueResult(defaultLocale.defaultLocale);
-        });
 
+            List<String> dbResult = query.from(defaultLocale).where(defaultLocale.key.eq(key)).forUpdate()
+                    .list(defaultLocale.key);
+
+            return dbResult.size() > 0;
+        });
+    }
+
+    private LocalizedValue[] readSortedLocalizedValuesFromDB(String key) {
+
+        return querydslSupport.execute((connection, configuration) -> {
+
+            SQLQuery query = new SQLQuery(connection, configuration);
+            QLocalizedData localizedData = QLocalizedData.localizedData;
+            QDefaultLocale defaultLocale = QDefaultLocale.defaultLocale;
+
+            List<Tuple> dbResults = query.from(localizedData)
+                    .innerJoin(defaultLocale).on(localizedData.key.eq(defaultLocale.key))
+                    .where(localizedData.key.eq(key))
+                    .orderBy(localizedData.languageTag.asc(), localizedData.value.asc())
+                    .list(localizedData.languageTag, localizedData.value, defaultLocale.languageTag);
+
+            LocalizedValue[] results = new LocalizedValue[dbResults.size()];
+            if (results.length == 0) {
+                return results;
+            }
+            String defaultLanguageTag = dbResults.get(0).get(defaultLocale.languageTag);
+            int i = 0;
+            Iterator<Tuple> iterator = dbResults.iterator();
+            while (iterator.hasNext()) {
+                Tuple tuple = iterator.next();
+                LocalizedValue result = new LocalizedValue();
+                String languageTag = tuple.get(localizedData.languageTag);
+                result.setLanguageTag(languageTag);
+                result.setValue(tuple.get(localizedData.value));
+                result.setDefaultValue(languageTag.equals(defaultLanguageTag));
+                results[i] = result;
+                i++;
+            }
+
+            return results;
+        });
     }
 
     @Override
@@ -200,11 +259,12 @@ public class LocalizationComponent implements LocalizedDataStore, LocalizationQd
     }
 
     @Override
-    public void removeValue(final String key, final Locale locale) {
-        // TODO
+    public void removeValue(String key, Locale locale) {
+        // TODO Auto-generated method stub
+
     }
 
-    public void setCacheConfiguration(CacheConfiguration<String, Map<Locale, LocalizedValue>> cacheConfiguration) {
+    public void setCacheConfiguration(CacheConfiguration<String, LocalizedValue[]> cacheConfiguration) {
         this.cacheConfiguration = cacheConfiguration;
     }
 
@@ -225,7 +285,14 @@ public class LocalizationComponent implements LocalizedDataStore, LocalizationQd
     }
 
     @Override
-    public void updateValue(final String key, final Locale locale, final String value) {
-        // TODO
+    public void switchDefaultLocale(String key, Locale locale) {
+        // TODO Auto-generated method stub
+
+    }
+
+    @Override
+    public void updateValue(String key, Locale locale, String value) {
+        // TODO Auto-generated method stub
+
     }
 }

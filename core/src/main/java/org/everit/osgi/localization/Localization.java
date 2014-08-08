@@ -17,26 +17,29 @@
 package org.everit.osgi.localization;
 
 import java.util.Locale;
+import java.util.Optional;
 import java.util.ResourceBundle;
 
 /**
  * A service that makes it possible to store localized key-value pairs. Keys and values have the type
  */
-public interface LocalizedDataStore {
+public interface Localization {
 
     /**
      * Saving a new String based localized data with the given key and locale. If there was no value for the specified
      * key before, this value will be the default.
      *
      * @param key
-     *            The key of the data. If null throw IllegalArgumentException
+     *            The key of the data.
      * @param locale
-     *            The locale of the data. If null throw IllegalArgumentException
+     *            The locale of the data.
      * @param value
      *            The value of the data. If length more then 2000 throw IllegalArgumentException.
      * @return The created localized data.
+     * @throws NullPointerException
+     *             if the key, locale or value is null
      * @throws IllegalArgumentException
-     *             if the key, locale or value is null or value is longer than 2000.
+     *             if value is longer than 2000.
      */
     void addValue(String key, Locale locale, String value);
 
@@ -46,7 +49,17 @@ public interface LocalizedDataStore {
      */
     void clearCache();
 
-    String getExactValue(String key, Locale locale);
+    /**
+     * Returns the value for the specified key with the specified locale.
+     *
+     * @param key
+     *            The key of the localized entry.
+     * @param locale
+     *            The locale of the entry.
+     * @return The value of the key and locale or {@link Optional#empty()} if there is no value for the specified
+     *         key-locale pair.
+     */
+    Optional<String> getExactValue(String key, Locale locale);
 
     /**
      * Getting the list of locals that are available for the given key.
@@ -58,6 +71,11 @@ public interface LocalizedDataStore {
     Locale[] getSupportedLocalesForKey(String key);
 
     /**
+     * Same as {@link #getValue(String, Locale, String)}. TODO
+     */
+    String getValue(String key, Locale locale);
+
+    /**
      * Getting a localized string by key the and locale. If the requested string is not available in the specified
      * locale, the locale will be cropped in the same way as {@link ResourceBundle} does. E.g.: If the locale en_GB is
      * queried, first the original locale is checked, than the 'en' than the default locale. If non of them exists, the
@@ -67,13 +85,15 @@ public interface LocalizedDataStore {
      *            The key of the localized data.
      * @param locale
      *            Null means default locale.
+     * @param defaultValue
+     *            the value that is returned if no entry found.
      * @return The localized data. If there is no data based on the given locale the default locale will be checked in
-     *         the same way as it is done in {@link java.util.ResourceBundle}. If there is no default locale, the key
-     *         will be returned.
+     *         the same way as it is done in {@link java.util.ResourceBundle}. If there is no default locale, the
+     *         defaultValue parameter is returned.
      * @throws NullPointerException
      *             if key is null.
      */
-    String getValue(String key, Locale locale);
+    String getValue(String key, Locale locale, String defaultValue);
 
     /**
      * Removes all values that belong the a specific key.
@@ -94,8 +114,25 @@ public interface LocalizedDataStore {
      *            The key of the localized value.
      * @param locale
      *            The {@link Locale} of the value.
+     * @throws NullPointerException
+     *             if the key or locale parameter is <code>null</code>.
+     * @throws DeletingNotAllowedException
+     *             if the locale is the default locale and there are other non-default values for the same key. In that
+     *             case it could not be decided, which locale should be the default one.
      */
     void removeValue(String key, Locale locale);
+
+    /**
+     * Switching the default locale of a key to a new one.
+     *
+     * @param key
+     *            The key of the localized entry.
+     * @param locale
+     *            The new default locale.
+     * @throws EntryDoesNotExistException
+     *             if key-locale based value does not exist.
+     */
+    void switchDefaultLocale(String key, Locale locale);
 
     /**
      * Updating an existing String based localized data. The localized data is identified by its key and locale.
@@ -107,8 +144,10 @@ public interface LocalizedDataStore {
      * @param value
      *            The value of the data. Maximum length is 2000 if more throw IllegalArgumentException.
      * @return The number of rows affected during update.
+     * @throws NullPointerException
+     *             if the key, locale or value is null
      * @throws IllegalArgumentException
-     *             if the key, locale or value is null or value is longer than 2000.
+     *             if value is longer than 2000.
      */
     void updateValue(String key, Locale locale, String value);
 }

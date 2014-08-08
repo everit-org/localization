@@ -24,27 +24,48 @@
         http://www.liquibase.org/xml/ns/dbchangelog-ext http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-ext.xsd">
 
   <changeSet id="1.0.0_10" author="everit">
-    <createTable tableName="loc_default_locale">
-      <column name="key_" type="varchar(255)">
-        <constraints nullable="false" primaryKey="true" primaryKeyName="pk_loc_default_locale" />
+    <createTable tableName="loc_dataset">
+      <column name="dataset_id" type="bigint">
+        <constraints nullable="false" primaryKey="true" primaryKeyName="pk_loc_dataset" />
       </column>
-      <column name="locale_" type="varchar(20)">
+      <column name="name_" type="varchar(255)">
+        <constraints unique="true" nullable="false" />
+      </column>
+      <column name="versions" type="varchar(255)" remarks="A well-formed IETF BCP 47 language tag representing this locale">
         <constraints nullable="false" />
       </column>
     </createTable>
   </changeSet>
 
   <changeSet id="1.0.0_20" author="everit">
-    <createTable tableName="loc_data">
+    <createTable tableName="loc_default_locale">
+      <column name="dataset_id" type="bigint">
+        <constraints nullable="false" />
+      </column>
       <column name="key_" type="varchar(255)">
         <constraints nullable="false" />
       </column>
-      <column name="locale_" type="varchar(20)">
+      <column name="language_tag" type="varchar(255)" remarks="A well-formed IETF BCP 47 language tag representing this locale">
+        <constraints nullable="false" />
+      </column>
+    </createTable>
+    <addPrimaryKey constraintName="pk_loc_default_locale" tableName="loc_default_locale" columnNames="dataset_id,key_" />
+  </changeSet>
+
+  <changeSet id="1.0.0_30" author="everit">
+    <createTable tableName="loc_data">
+      <column name="dataset_id" type="bigint">
+        <constraints nullable="false" />
+      </column>
+      <column name="key_" type="varchar(255)">
+        <constraints nullable="false" />
+      </column>
+      <column name="language_tag" type="varchar(255)" remarks="A well-formed IETF BCP 47 language tag representing this locale">
         <constraints nullable="false" />
       </column>
       <column name="value_" type="varchar(2000)" />
     </createTable>
-    <addPrimaryKey tableName="loc_data" columnNames="key_, locale_" constraintName="pk_loc_data" />
+    <addPrimaryKey tableName="loc_data" columnNames="dataset_id,key_,language_tag" constraintName="pk_loc_data" />
   </changeSet>
 </databaseChangeLog>
 

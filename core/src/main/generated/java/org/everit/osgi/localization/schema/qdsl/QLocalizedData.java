@@ -1,19 +1,3 @@
-/**
- * This file is part of Everit - Localization.
- *
- * Everit - Localization is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * Everit - Localization is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with Everit - Localization.  If not, see <http://www.gnu.org/licenses/>.
- */
 package org.everit.osgi.localization.schema.qdsl;
 
 import static com.mysema.query.types.PathMetadataFactory.*;
@@ -41,15 +25,15 @@ public class QLocalizedData extends com.mysema.query.sql.RelationalPathBase<QLoc
 
     public class PrimaryKeys {
 
-        public final com.mysema.query.sql.PrimaryKey<QLocalizedData> locDataPk = createPrimaryKey(key_, locale_);
+        public final com.mysema.query.sql.PrimaryKey<QLocalizedData> localizedDataPK = createPrimaryKey(key, languageTag);
 
     }
 
-    public final StringPath key_ = createString("key_");
+    public final StringPath key = createString("key");
 
-    public final StringPath locale_ = createString("locale_");
+    public final StringPath languageTag = createString("languageTag");
 
-    public final StringPath value_ = createString("value_");
+    public final StringPath value = createString("value");
 
     public final PrimaryKeys pk = new PrimaryKeys();
 
@@ -74,9 +58,9 @@ public class QLocalizedData extends com.mysema.query.sql.RelationalPathBase<QLoc
     }
 
     public void addMetadata() {
-        addMetadata(key_, ColumnMetadata.named("key_").ofType(12).withSize(255).notNull());
-        addMetadata(locale_, ColumnMetadata.named("locale_").ofType(12).withSize(20).notNull());
-        addMetadata(value_, ColumnMetadata.named("value_").ofType(12).withSize(2000));
+        addMetadata(key, ColumnMetadata.named("key_").ofType(12).withSize(255).notNull());
+        addMetadata(languageTag, ColumnMetadata.named("language_tag").ofType(12).withSize(255).notNull());
+        addMetadata(value, ColumnMetadata.named("value_").ofType(12).withSize(2000));
     }
 
 }
