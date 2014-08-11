@@ -19,6 +19,24 @@
 <lqmg xmlns="http://everit.org/lqmg" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" defaultPackage="org.everit.osgi.localization.schema.qdsl">
   <namingRules>
     <classNameRule>
+      <entity>loc_dataset</entity>
+      <class>DataSet</class>
+      <propertyMappings>
+        <primaryKey>
+          <name>pk_loc_dataset</name>
+          <property>dataSetPK</property>
+        </primaryKey>
+        <column>
+          <name>name_</name>
+          <property>name</property>
+        </column>
+        <column>
+          <name>value_</name>
+          <property>value</property>
+        </column>
+      </propertyMappings>
+    </classNameRule>
+    <classNameRule>
       <entity>loc_data</entity>
       <class>LocalizedData</class>
       <propertyMappings>
@@ -34,6 +52,10 @@
           <name>value_</name>
           <property>value</property>
         </column>
+        <foreignKey>
+          <name>fk_loc_dataset_data</name>
+          <property>dataSetFK</property>
+        </foreignKey>
       </propertyMappings>
     </classNameRule>
     <classNameRule>
@@ -48,6 +70,10 @@
           <name>key_</name>
           <property>key</property>
         </column>
+        <foreignKey>
+          <name>fk_loc_dataset_default_locale</name>
+          <property>dataSetFK</property>
+        </foreignKey>
       </propertyMappings>
     </classNameRule>
   </namingRules>

@@ -25,11 +25,8 @@
 
   <changeSet id="1.0.0_10" author="everit">
     <createTable tableName="loc_dataset">
-      <column name="dataset_id" type="bigint">
-        <constraints nullable="false" primaryKey="true" primaryKeyName="pk_loc_dataset" />
-      </column>
       <column name="name_" type="varchar(255)">
-        <constraints unique="true" nullable="false" />
+        <constraints nullable="false" primaryKey="true" primaryKeyName="pk_loc_dataset" />
       </column>
       <column name="versions" type="varchar(255)" remarks="A well-formed IETF BCP 47 language tag representing this locale">
         <constraints nullable="false" />
@@ -39,8 +36,8 @@
 
   <changeSet id="1.0.0_20" author="everit">
     <createTable tableName="loc_default_locale">
-      <column name="dataset_id" type="bigint">
-        <constraints nullable="false" />
+      <column name="dataset_name" type="varchar(255)">
+        <constraints nullable="false" foreignKeyName="fk_loc_dataset_default_locale" referencedTableName="loc_dataset" referencedColumnNames="name_" />
       </column>
       <column name="key_" type="varchar(255)">
         <constraints nullable="false" />
@@ -49,13 +46,13 @@
         <constraints nullable="false" />
       </column>
     </createTable>
-    <addPrimaryKey constraintName="pk_loc_default_locale" tableName="loc_default_locale" columnNames="dataset_id,key_" />
+    <addPrimaryKey constraintName="pk_loc_default_locale" tableName="loc_default_locale" columnNames="dataset_name,key_" />
   </changeSet>
 
   <changeSet id="1.0.0_30" author="everit">
     <createTable tableName="loc_data">
-      <column name="dataset_id" type="bigint">
-        <constraints nullable="false" />
+      <column name="dataset_name" type="varchar(255)">
+        <constraints nullable="false" foreignKeyName="fk_loc_dataset_data" referencedTableName="loc_dataset" referencedColumnNames="name_" />
       </column>
       <column name="key_" type="varchar(255)">
         <constraints nullable="false" />
@@ -65,7 +62,7 @@
       </column>
       <column name="value_" type="varchar(2000)" />
     </createTable>
-    <addPrimaryKey tableName="loc_data" columnNames="dataset_id,key_,language_tag" constraintName="pk_loc_data" />
+    <addPrimaryKey tableName="loc_data" columnNames="dataset_name,key_,language_tag" constraintName="pk_loc_data" />
   </changeSet>
 </databaseChangeLog>
 

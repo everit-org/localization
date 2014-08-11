@@ -25,15 +25,25 @@ public class QDefaultLocale extends com.mysema.query.sql.RelationalPathBase<QDef
 
     public class PrimaryKeys {
 
-        public final com.mysema.query.sql.PrimaryKey<QDefaultLocale> defaultLocalePK = createPrimaryKey(key);
+        public final com.mysema.query.sql.PrimaryKey<QDefaultLocale> defaultLocalePK = createPrimaryKey(datasetName, key);
 
     }
+
+    public class ForeignKeys {
+
+        public final com.mysema.query.sql.ForeignKey<QDataSet> dataSetFK = createForeignKey(datasetName, "name_");
+
+    }
+
+    public final StringPath datasetName = createString("datasetName");
 
     public final StringPath key = createString("key");
 
     public final StringPath languageTag = createString("languageTag");
 
     public final PrimaryKeys pk = new PrimaryKeys();
+
+    public final ForeignKeys fk = new ForeignKeys();
 
     public QDefaultLocale(String variable) {
         super(QDefaultLocale.class, forVariable(variable), "org.everit.osgi.localization", "loc_default_locale");
@@ -56,6 +66,7 @@ public class QDefaultLocale extends com.mysema.query.sql.RelationalPathBase<QDef
     }
 
     public void addMetadata() {
+        addMetadata(datasetName, ColumnMetadata.named("dataset_name").ofType(12).withSize(255).notNull());
         addMetadata(key, ColumnMetadata.named("key_").ofType(12).withSize(255).notNull());
         addMetadata(languageTag, ColumnMetadata.named("language_tag").ofType(12).withSize(255).notNull());
     }

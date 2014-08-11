@@ -25,9 +25,17 @@ public class QLocalizedData extends com.mysema.query.sql.RelationalPathBase<QLoc
 
     public class PrimaryKeys {
 
-        public final com.mysema.query.sql.PrimaryKey<QLocalizedData> localizedDataPK = createPrimaryKey(key, languageTag);
+        public final com.mysema.query.sql.PrimaryKey<QLocalizedData> localizedDataPK = createPrimaryKey(datasetName, key, languageTag);
 
     }
+
+    public class ForeignKeys {
+
+        public final com.mysema.query.sql.ForeignKey<QDataSet> dataSetFK = createForeignKey(datasetName, "name_");
+
+    }
+
+    public final StringPath datasetName = createString("datasetName");
 
     public final StringPath key = createString("key");
 
@@ -36,6 +44,8 @@ public class QLocalizedData extends com.mysema.query.sql.RelationalPathBase<QLoc
     public final StringPath value = createString("value");
 
     public final PrimaryKeys pk = new PrimaryKeys();
+
+    public final ForeignKeys fk = new ForeignKeys();
 
     public QLocalizedData(String variable) {
         super(QLocalizedData.class, forVariable(variable), "org.everit.osgi.localization", "loc_data");
@@ -58,6 +68,7 @@ public class QLocalizedData extends com.mysema.query.sql.RelationalPathBase<QLoc
     }
 
     public void addMetadata() {
+        addMetadata(datasetName, ColumnMetadata.named("dataset_name").ofType(12).withSize(255).notNull());
         addMetadata(key, ColumnMetadata.named("key_").ofType(12).withSize(255).notNull());
         addMetadata(languageTag, ColumnMetadata.named("language_tag").ofType(12).withSize(255).notNull());
         addMetadata(value, ColumnMetadata.named("value_").ofType(12).withSize(2000));
