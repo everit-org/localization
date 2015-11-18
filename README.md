@@ -1,4 +1,4 @@
 localization-ri
 ===============
 
-Documentation: http://wwww.everit.org/localization-ri
+Documentation: http://www.everit.org/localization-ri
